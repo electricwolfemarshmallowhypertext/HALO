@@ -1,7 +1,7 @@
 """Isolated integration test for ``search_trace``.
 
 Invokes the registered SDK ``FunctionTool`` against a real ``TraceStore`` and
-asserts the exact match count for a known substring.
+asserts the ``SpanMatchRecord`` shape returned for a known regex pattern.
 """
 
 from __future__ import annotations
@@ -35,9 +35,15 @@ async def test_search_trace_through_sdk_adapter(tmp_path: Path, fixtures_dir: Pa
 
     raw = await tools["search_trace"].on_invoke_tool(
         MagicMock(spec=SdkToolContext),
-        '{"trace_id": "t-bbbb", "pattern": "tool failure"}',
+        '{"trace_id": "t-bbbb", "regex_pattern": "tool failure"}',
     )
     payload = json.loads(raw)["result"]
     assert payload["trace_id"] == "t-bbbb"
     assert payload["match_count"] == 1
-    assert "tool failure" in payload["matches"][0]
+    assert payload["returned_match_count"] == 1
+    assert payload["has_more"] is False
+    record = payload["matches"][0]
+    assert record["span_id"] == "s-bbbb-2"
+    assert record["match_text"] == "tool failure"
+    assert "tool failure" in record["matched_context"]
+    assert record["raw_jsonl_bytes"] > 0
